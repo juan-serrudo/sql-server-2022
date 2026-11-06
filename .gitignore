@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+backups/*
+!backups/.gitkeep
+*.bak
+*.BAK
+*.mdf
+*.ndf
+*.ldf
+reports/*
+!reports/.gitkeep
+sql/generated/
+restore-plan.json
+__pycache__/
+*.pyc

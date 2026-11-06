@@ -1,0 +1,63 @@
+name: sqlserver-historico
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    environment:
+      ACCEPT_EULA: ${ACCEPT_EULA:?Debe aceptar la licencia en .env}
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Configure una contraseña en .env}
+      MSSQL_MEMORY_LIMIT_MB: "4096"
+    ports:
+      - "127.0.0.1:1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+      - type: bind
+        source: ./backups
+        target: /var/opt/mssql/backup
+        read_only: true
+        bind:
+          create_host_path: false
+    restart: unless-stopped
+    stop_grace_period: 120s
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          if [ -x /opt/mssql-tools18/bin/sqlcmd ]; then
+          SQLCMDPASSWORD="$${MSSQL_SA_PASSWORD}"
+          /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -N -C -b -l 5 -t 5
+          -Q 'SET NOCOUNT ON; SELECT 1;' >/dev/null 2>&1;
+          else exit 1; fi
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  tools:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: tools.Dockerfile
+    platform: linux/amd64
+    environment:
+      SQLCMDPASSWORD: ${MSSQL_SA_PASSWORD:?Configure .env}
+    entrypoint: ["/opt/mssql-tools18/bin/sqlcmd"]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  sqlserver-data:
